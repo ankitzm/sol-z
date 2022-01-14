@@ -191,6 +191,31 @@ function App() {
     }
   }
 
+  // capping token supply
+  // if the supply is capped as 1 -> it can work as a NFT.
+  const capSupplyHelper = async () => {
+    try {
+      setLoading(true);
+      const connection = new Connection(
+        clusterApiUrl("devnet"),
+        "confirmed"
+      );
+
+      const createMintingWallet = await Keypair.fromSecretKey(Uint8Array.from(Object.values(JSON.parse(mintingWalletSecretKey))));
+      const fromAirDropSignature = await connection.requestAirdrop(createMintingWallet.publicKey, LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(fromAirDropSignature);
+
+      const creatorToken = new Token(connection, createdTokenPublicKey, TOKEN_PROGRAM_ID, createMintingWallet);
+      await creatorToken.setAuthority(createdTokenPublicKey, null, "MintTokens", createMintingWallet.publicKey, [createMintingWallet]);
+
+      setSupplyCapped(true)
+      setLoading(false);
+    } catch (err) {
+      console.log(err);
+      setLoading(false);
+    }
+  }
+
 
   return (
     <div>
@@ -225,7 +250,12 @@ function App() {
         <li>Transfer token to other account
           <button disabled={loading} onClick={transferTokenHelper}> transfer 10 token</button>
         </li>) : <></>
+      }
 
+      {walletConnected ? (
+        <li>Cap token supply
+          <button disabled={loading} onClick={capSupplyHelper}> Cap supply</button>
+        </li>) : <></>
       }
 
     </div>
