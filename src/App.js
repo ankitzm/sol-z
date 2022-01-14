@@ -16,6 +16,8 @@ function App() {
   const [createdTokenPublicKey, setCreatedTokenPublicKey] = useState(null)
   const [mintingWalletSecretKey, setMintingWalletSecretKey] = useState(null)
 
+  const [supplyCapped, setSupplyCapped] = useState(false)
+
   const getProvider = async () => {
     if ("solana" in window) {
       const provider = window.solana;
@@ -106,6 +108,45 @@ function App() {
     }
   }
 
+  // minting more token (100)
+  const mintAgainHelper = async () => {
+    try {
+      setLoading(true);
+      const connection = new Connection(
+        clusterApiUrl("devnet"),
+        "confirmed"
+      );
+      const createMintingWallet = await Keypair.fromSecretKey(Uint8Array.from(Object.values(JSON.parse(mintingWalletSecretKey))));
+      const mintRequester = await provider.publicKey;
+
+      const fromAirDropSignature = await connection.requestAirdrop(createMintingWallet.publicKey, LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(fromAirDropSignature, { commitment: "confirmed" });
+
+      const creatorToken = new Token(connection, createdTokenPublicKey, TOKEN_PROGRAM_ID, createMintingWallet);
+      const fromTokenAccount = await creatorToken.getOrCreateAssociatedAccountInfo(createMintingWallet.publicKey);
+      const toTokenAccount = await creatorToken.getOrCreateAssociatedAccountInfo(mintRequester);
+      await creatorToken.mintTo(fromTokenAccount.address, createMintingWallet.publicKey, [], 100000000);
+
+      const transaction = new Transaction().add(
+        Token.createTransferInstruction(
+          TOKEN_PROGRAM_ID,
+          fromTokenAccount.address,
+          toTokenAccount.address,
+          createMintingWallet.publicKey,
+          [],
+          100000000
+        )
+      );
+      await sendAndConfirmTransaction(connection, transaction, [createMintingWallet], { commitment: "confirmed" });
+
+      setLoading(false);
+    } catch (err) {
+      console.log(err);
+      setLoading(false);
+    }
+  }
+
+
   return (
     <div>
       hudab
@@ -132,6 +173,9 @@ function App() {
             <button disabled={loading} onClick={initialMintHelper}>Initial Mint </button>
           </p>) : <></>
       }
+
+      <li>Mint More 100 tokens: <button disabled={loading || supplyCapped} onClick={mintAgainHelper}>Mint Again</button></li>
+
 
     </div>
   )
